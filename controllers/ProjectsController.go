@@ -21,12 +21,11 @@ import (
 // @Tags projects
 // @Accept json
 // @Produce json
-// @Param project body ProjectRequest true "Project object to be inserted"
-// @Success 200 {object} Response
-// @Failure 400 {object} Response
-// @Failure 500 {object} Response
+// @Param project body models.Project true "Project to be inserted"
+// @Success 200 {object} models.Project
+// @Failure 404 {} string "User not found"
+// @Failure 500 {object} models.Response
 // @Router /projects [post]
-
 func InsertProject(w http.ResponseWriter, r *http.Request) {
 	var response models.Response
 
@@ -55,7 +54,7 @@ func InsertProject(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 
 	// Prepare the SQL statements
-	projectQuery := "INSERT INTO projects (projectid,title, date, sapnumber, notes, branchId, statusId, serviceId) VALUES (?, ?, ?, ?, ?, ?, ?,?)"
+	projectQuery := "INSERT INTO projects (id,title, date, sapnumber, notes, branchId, statusId, serviceId) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
 	serviceQuery := "INSERT INTO services (id, name) VALUES (?, ?) ON DUPLICATE KEY UPDATE name = ?"
 
 	// Insert or update the service in the services table
@@ -69,7 +68,7 @@ func InsertProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Insert project into the projects table
-	_, err = db.Exec(projectQuery,project.ProjectID, project.Title, project.Date, project.SAPNumber, project.Notes, project.BranchID, project.StatusID, project.Service.ID)
+	_, err = db.Exec(projectQuery, project.ID,project.Title, project.Date, project.SAPNumber, project.Notes, project.BranchID, project.StatusID, project.Service.ID)
 	if err != nil {
 		log.Print(err)
 		response.Status = 500
@@ -92,12 +91,12 @@ func InsertProject(w http.ResponseWriter, r *http.Request) {
 // @Tags projects
 // @Accept json
 // @Produce json
-// @Param project body ProjectRequest true "Project object to be updated"
-// @Success 200 {object} Response
-// @Failure 400 {object} Response
-// @Failure 500 {object} Response
-// @Router /projects [put]
-
+// @Param id path int true "Project ID"
+// @Param project body models.Project true "Project object to be updated"
+// @Success 200 {object} models.Project
+// @Failure 400 {object} models.Response
+// @Failure 500 {object} models.Response
+// @Router /projects/{id} [put]
 func UpdateProject(w http.ResponseWriter, r *http.Request) {
 	var response models.Response
 
@@ -128,7 +127,7 @@ func UpdateProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Prepare the SQL statements
-	projectQuery := "UPDATE projects SET title = ?, sapnumber = ?, notes = ?, branchId = ?, statusId = ?, serviceId = ? WHERE projectid = ?"
+	projectQuery := "UPDATE projects SET title = ?, sapnumber = ?, notes = ?, branchId = ?, statusId = ?, serviceId = ? WHERE id = ?"
 	serviceQuery := "INSERT INTO services (id, name) VALUES (?, ?) ON DUPLICATE KEY UPDATE name = ?"
 
 		// Check if the serviceId exists in the services table
@@ -157,7 +156,7 @@ func UpdateProject(w http.ResponseWriter, r *http.Request) {
 		}
 
 	// Update project data in the database
-	_, err = db.Exec(projectQuery, project.Title, project.SAPNumber, project.Notes, project.BranchID, project.StatusID, project.Service.ID, project.ProjectID)
+	_, err = db.Exec(projectQuery, project.Title, project.SAPNumber, project.Notes, project.BranchID, project.StatusID, project.Service.ID, project.ID)
 	if err != nil {
 		log.Print(err)
 		response.Status = 500
@@ -186,15 +185,15 @@ func UpdateProject(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	json.NewEncoder(w).Encode(response)
 }
+
 // GetProject returns the list of projects.
 // @Summary Get the list of projects
 // @Description Get the list of projects from the database
 // @Tags projects
 // @Produce json
-// @Success 200 {object} Response
-// @Failure 500 {object} Response
+// @Success 200 {object} models.Project
+// @Failure 500 {object} models.Response
 // @Router /projects [get]
-
 func GetProject(w http.ResponseWriter, r *http.Request) {
 	var response models.Response
 	var arrProject []models.Project
@@ -202,7 +201,7 @@ func GetProject(w http.ResponseWriter, r *http.Request) {
 	db := database.GetDB()
 	defer db.Close()
 
-	rows, err := db.Query("SELECT p.projectid, p.title,  p.sapnumber, p.notes, p.branchid, p.statusid, s.id, s.name " +
+	rows, err := db.Query("SELECT p.id, p.title,  p.sapnumber, p.notes, p.branchid, p.statusid, s.id, s.name " +
 		"FROM projects p " +
 		"JOIN services s ON p.serviceid = s.id")
 	if err != nil {
@@ -216,7 +215,7 @@ func GetProject(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var project models.Project
 		var service models.Service
-		err = rows.Scan(&project.ProjectID, &project.Title, &project.SAPNumber, &project.Notes, &project.BranchID, &project.StatusID, &service.ID, &service.Name)
+		err = rows.Scan(&project.ID, &project.Title, &project.SAPNumber, &project.Notes, &project.BranchID, &project.StatusID, &service.ID, &service.Name)
 
 		if err != nil {
 			log.Fatal(err.Error())
@@ -245,9 +244,9 @@ func GetProject(w http.ResponseWriter, r *http.Request) {
 // @Tags projects
 // @Produce json
 // @Param id path int true "Project ID"
-// @Success 200 {object} Response
-// @Failure 404 {object} Response
-// @Failure 500 {object} Response
+// @Success 200 {object} models.Project
+// @Failure 404 {object} models.Response
+// @Failure 500 {object} models.Response
 // @Router /projects/{id} [get]
 func GetProjectByID(w http.ResponseWriter, r *http.Request) {
 	var response models.Response
@@ -264,8 +263,8 @@ func GetProjectByID(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 
 	project := models.Project{}
-	err = db.QueryRow("SELECT p.projectid, p.title, p.date, p.sapnumber, p.notes, p.branchId, p.statusId, p.serviceId, s.name FROM projects p JOIN services s ON p.serviceId = s.id WHERE p.projectid = ?", id).
-		Scan(&project.ProjectID, &project.Title, &project.Date, &project.SAPNumber, &project.Notes, &project.BranchID, &project.StatusID, &project.Service.ID, &project.Service.Name)
+	err = db.QueryRow("SELECT p.id, p.title, p.date, p.sapnumber, p.notes, p.branchId, p.statusId, p.serviceId, s.name FROM projects p JOIN services s ON p.serviceId = s.id WHERE p.id = ?", id).
+		Scan(&project.ID, &project.Title, &project.Date, &project.SAPNumber, &project.Notes, &project.BranchID, &project.StatusID, &project.Service.ID, &project.Service.Name)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			log.Printf("No Project with that ID.")
@@ -286,17 +285,17 @@ func GetProjectByID(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	json.NewEncoder(w).Encode(response)
 }
+
 // DeleteProject deletes a project by its ID.
 // @Summary Delete a project by ID
 // @Description Delete a project from the database by its ID
 // @Tags projects
 // @Produce json
 // @Param id path int true "Project ID"
-// @Success 200 {object} Response
-// @Failure 400 {object} Response
-// @Failure 500 {object} Response
+// @Success 200 {object} models.Response
+// @Failure 404 {object} models.Response
+// @Failure 500 {object} models.Response
 // @Router /projects/{id} [delete]
-
 func DeleteProject(w http.ResponseWriter, r *http.Request) {
 	var response models.Response
 
@@ -313,7 +312,7 @@ func DeleteProject(w http.ResponseWriter, r *http.Request) {
 	db := database.GetDB()
 	defer db.Close()
 
-	_, err = db.Exec("DELETE FROM projects WHERE projectid = ?", id)
+	_, err = db.Exec("DELETE FROM projects WHERE id = ?", id)
 	if err != nil {
 		log.Print(err)
 		response.Status = 500
@@ -323,7 +322,7 @@ func DeleteProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.Status = 200
-	response.Message = "Delete data successfully"
+	response.Message = "Project deleted successfully"
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")

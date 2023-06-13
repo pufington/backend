@@ -1,12 +1,13 @@
 package routers
 
 import (
+	"log"
 	"net/http"
 
 	controller "example.com/controllers"
 	"github.com/go-chi/chi"
 	"github.com/swaggo/http-swagger"
-	// _ "example.com/docs" // Import the generated Swagger docs
+	_ "example.com/docs" // Import the generated Swagger docs
 )
 
 // SetRoutes sets up the routing for the API
@@ -114,9 +115,13 @@ func SetRoutes() {
 	 */
 	r.Post("/upload", controller.UploadHandler)
 
-	// Swagger UI route
-	r.Get("/swagger/*", httpSwagger.WrapHandler)
-
+		// Swagger UI route
+		r.Get("/swagger/*", httpSwagger.Handler(
+			httpSwagger.URL("http://localhost:3000/swagger/doc.json"), //The url pointing to API definition
+		))
+	
+	port:=":3000"
 	// Serve
-	http.ListenAndServe(":8080", r)
+	log.Printf("serving at port %s",port)
+	log.Fatal(http.ListenAndServe(port, r))
 }
